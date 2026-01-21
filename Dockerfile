@@ -33,27 +33,34 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.cargo/bin:$PATH"
 
-# 5. Install Oh My Zsh & Powerline (The ClaudeBox Shell Experience)
+# 9. Create non-root user 'box'
+# We set a fixed UID/GID for consistency
+RUN groupadd -g 1000 box && \
+    useradd -m -u 1000 -g box -s /bin/zsh box && \
+    usermod -aG sudo box
+
+# 10. Install 'uv' for the 'box' user
+USER box
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/box/.cargo/bin:/home/box/.local/bin:$PATH"
+
+# 11. Install Oh My Zsh for 'box'
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-# Change default shell to zsh
-RUN chsh -s $(which zsh)
 
-# 6. Configure SSH
-RUN mkdir /var/run/sshd
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-RUN sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config
-
-# 7. Workspace Setup
-WORKDIR /root/project
-
-# 8. Add persistent history for Zsh (so you don't lose command history on restart)
-RUN echo 'export HISTFILE=/root/project/.zsh_history' >> /root/.zshrc
-RUN echo 'export HISTSIZE=10000' >> /root/.zshrc
-RUN echo 'export SAVEHIST=10000' >> /root/.zshrc
-
-# 9. Startup Script
+# 12. Startup Script
+USER root
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
+
+# 13. Workspace Setup
+WORKDIR /home/box/project
+# Set ownership of workspace to box
+RUN chown -R box:box /home/box/project
+
+# 14. Add persistent history for box
+RUN echo 'export HISTFILE=/home/box/project/.zsh_history' >> /home/box/.zshrc && \
+    echo 'export HISTSIZE=10000' >> /home/box/.zshrc && \
+    echo 'export SAVEHIST=10000' >> /home/box/.zshrc
 
 EXPOSE 22
 
